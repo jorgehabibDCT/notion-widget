@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboards & Resources</title>
+  <style>
+    :root { --border:#e5e7eb; --muted:#6b7280; --pill:#f3f4f6; }
+    * { box-sizing: border-box; }
+    body{ font-family: ui-sans-serif,system-ui,Arial; margin:0; background:#fff; color:#111; }
+    header{ padding:16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:#fff; z-index:10 }
+    .controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    input,select,button{ padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:14px; }
+    input.search{ flex:1; min-width:220px; }
+    main{ padding:16px; }
+    .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+    .card{ border:1px solid var(--border); border-radius:14px; padding:14px; }
+    .title{ font-weight:700; font-size:16px; margin:0 0 6px; line-height:1.2; }
+    .meta{ font-size:12px; color:var(--muted); margin-bottom:8px; }
+    .desc{ font-size:14px; margin-bottom:8px; }
+    .tags{ display:flex; gap:6px; flex-wrap:wrap; }
+    .tag{ font-size:11px; background:var(--pill); border-radius:999px; padding:2px 8px; }
+    .row{ display:flex; gap:8px; align-items:center; }
+    .right{ margin-left:auto; display:flex; gap:8px; }
+    .footer{ text-align:center; color:var(--muted); font-size:12px; padding:10px 0; }
+    a { color:#2563eb; text-decoration:none; }
+    .error{ color:#b91c1c; font-weight:600; padding:8px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="controls">
+      <input id="q" class="search" placeholder="Search name, description, tags…" />
+      <select id="type"><option value="">All types</option></select>
+      <select id="category"><option value="">All categories</option></select>
+      <div class="right">
+        <select id="sort">
+          <option value="alpha">Sort: A–Z</option>
+          <option value="updated">Sort: Updated (newest)</option>
+        </select>
+        <button id="refresh" title="Reload feed">↻</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="status" class="meta"></div>
+    <div id="grid" class="grid"></div>
+    <div class="footer" id="footer"></div>
+  </main>
+
+  <script>
+  // ===================== CONFIG =====================
+  // Change FEED_URL to your manifest feed:
+  const FEED_URL = "https://cdn.pegasusgateway.com/pegasus/dashboards_resources.json";
+
+  // Optional: simple field mapping (left = normalized, right = your JSON keys in priority order)
+  const FIELD_MAP = {
+    id:        ["id","slug","script","key","uid","url"],
+    title:     ["title","name","script","label"],
+    url:       ["url","app_url","href","link"],
+    type:      ["type","kind"],                 // e.g., Dashboard/Report/Doc
+    category:  ["category","group","section"],  // e.g., Fleet/Trips/Devices
+    tags:      ["tags","labels"],
+    description:["description","desc","summary","details"],
+    updated_at:["updated_at","modified","updated","last_modified","timestamp"]
+  };
+
+  // ===================== CORE =====================
+  const state = { items: [], q:"", type:"", category:"", sort:"alpha" };
+  const $ = s => document.querySelector(s);
+  const grid = $("#grid"), q = $("#q"), type = $("#type"), category = $("#category");
+  const sortSel = $("#sort"), refreshBtn = $("#refresh"), status = $("#status"), footer = $("#footer");
+
+  const uniq = arr => [...new Set(arr.filter(Boolean))];
+
+  function pick(obj, keys) {
+    for (const k of keys) {
+      const v = obj?.[k];
+      if (v !== undefined && v !== null && !(typeof v === "string" && v.trim() === "")) return v;
+    }
+    return undefined;
+  }
+
+  function normalizeOne(x, i) {
+    const n = {
+      id: pick(x, FIELD_MAP.id),
+      title: pick(x, FIELD_MAP.title),
+      url: pick(x, FIELD_MAP.url),
+      type: pick(x, FIELD_MAP.type),
+      category: pick(x, FIELD_MAP.category),
+      tags: pick(x, FIELD_MAP.tags) || [],
+      description: pick(x, FIELD_MAP.description) || "",
+      updated_at: pick(x, FIELD_MAP.updated_at)
+    };
+    if (!n.id) n.id = n.url || `item-${i+1}`;
+    if (!n.title) n.title = `Item ${i+1}`;
+    if (!Array.isArray(n.tags)) n.tags = typeof n.tags === "string" ? n.tags.split(/[,\s]+/) : [];
+    return n;
+  }
+
+  function extractItems(json) {
+    // Try common containers: items / scripts / resources / dashboards / data / array itself
+    if (Array.isArray(json)) return json;
+    const candidates = ["items","scripts","resources","dashboards","data","entries","list"];
+    for (const k of candidates) if (Array.isArray(json?.[k])) return json[k];
+    // If object of objects
+    if (json && typeof json === "object") {
+      const vals = Object.values(json);
+      if (vals.length && vals.every(v => typeof v === "object")) return vals;
+    }
+    return [];
+  }
+
+  function applyFilters(items) {
+    const qv = state.q.toLowerCase();
+    let filtered = items.filter(it => {
+      const hay = `${it.title||""} ${it.description||""} ${(it.tags||[]).join(" ")}`.toLowerCase();
+      const matchQ = !qv || hay.includes(qv);
+      const matchT = !state.type || it.type === state.type;
+      const matchC = !state.category || it.category === state.category;
+      return matchQ && matchT && matchC;
+    });
+    if (state.sort === "alpha") {
+      filtered = filtered.sort((a,b)=> (a.title||"").localeCompare(b.title||""));
+    } else if (state.sort === "updated") {
+      filtered = filtered.sort((a,b)=> (new Date(b.updated_at||0)) - (new Date(a.updated_at||0)));
+    }
+    return filtered;
+  }
+
+  function render(items) {
+    grid.innerHTML = items.map(it => `
+      <div class="card">
+        <div class="title">${escapeHtml(it.title)}</div>
+        <div class="meta">
+          ${it.type ? `<b>${escapeHtml(it.type)}</b>` : ''} ${it.category ? `· ${escapeHtml(it.category)}` : ''}
+          ${it.updated_at ? ` · ${new Date(it.updated_at).toLocaleDateString()}` : ''}
+        </div>
+        ${it.description ? `<div class="desc">${escapeHtml(it.description)}</div>` : ''}
+        ${it.tags?.length ? `<div class="tags">${it.tags.map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+        ${it.url ? `<div style="margin-top:8px"><a href="${encodeURI(it.url)}" target="_blank" rel="noopener">Open</a></div>` : ''}
+      </div>
+    `).join("");
+  }
+
+  function fillFilters(items) {
+    const types = uniq(items.map(i=>i.type));
+    const cats  = uniq(items.map(i=>i.category));
+    type.innerHTML = ['<option value="">All types</option>', ...types.map(t=>`<option>${escapeHtml(t)}</option>`)].join('');
+    category.innerHTML = ['<option value="">All categories</option>', ...cats.map(c=>`<option>${escapeHtml(c)}</option>`)].join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;").replaceAll("'","&#39;");
+  }
+
+  function persistToHash() {
+    const params = new URLSearchParams();
+    if (state.q) params.set("q", state.q);
+    if (state.type) params.set("type", state.type);
+    if (state.category) params.set("category", state.category);
+    if (state.sort !== "alpha") params.set("sort", state.sort);
+    location.hash = params.toString();
+  }
+
+  function readFromHash() {
+    const p = new URLSearchParams(location.hash.replace(/^#/,''));
+    state.q = p.get("q") || "";
+    state.type = p.get("type") || "";
+    state.category = p.get("category") || "";
+    state.sort = p.get("sort") || "alpha";
+    q.value = state.q; type.value = state.type; category.value = state.category; sortSel.value = state.sort;
+  }
+
+  async function loadFeed() {
+    status.textContent = "Loading…";
+    grid.innerHTML = "";
+    try {
+      const res = await fetch(FEED_URL, { mode: "cors" });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const json = await res.json();
+      const raw = extractItems(json);
+      state.items = raw.map(normalizeOne);
+      fillFilters(state.items);
+      render(applyFilters(state.items));
+      status.textContent = `Loaded ${state.items.length} items`;
+      footer.textContent = typeof json?.updated_at === "string" ? `Feed updated ${new Date(json.updated_at).toLocaleString()}` : "";
+      persistToHash();
+    } catch (err) {
+      status.innerHTML = `<span class="error">Failed to load feed: ${escapeHtml(err.message)}</span>`;
+    }
+  }
+
+  // Events
+  q.addEventListener("input", e => { state.q = e.target.value; render(applyFilters(state.items)); persistToHash(); });
+  type.addEventListener("change", e => { state.type = e.target.value; render(applyFilters(state.items)); persistToHash(); });
+  category.addEventListener("change", e => { state.category = e.target.value; render(applyFilters(state.items)); persistToHash(); });
+  sortSel.addEventListener("change", e => { state.sort = e.target.value; render(applyFilters(state.items)); persistToHash(); });
+  refreshBtn.addEventListener("click", loadFeed);
+  window.addEventListener("hashchange", () => { readFromHash(); render(applyFilters(state.items)); });
+
+  // Boot
+  readFromHash();
+  loadFeed();
+  </script>
+</body>
+</html>
