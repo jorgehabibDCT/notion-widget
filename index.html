@@ -1,110 +1,169 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Dashboards & Resources</title>
   <style>
-    :root { --border:#e5e7eb; --muted:#6b7280; --pill:#f3f4f6; }
-    * { box-sizing: border-box; }
-    body{ font-family: ui-sans-serif,system-ui,Arial; margin:0; background:#fff; color:#111; }
-    header{ padding:16px; border-bottom:1px solid var(--border); position:sticky; top:0; background:#fff; z-index:10 }
-    .controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    input,select,button{ padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:14px; }
-    input.search{ flex:1; min-width:220px; }
-    main{ padding:16px; }
-    .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
-    .card{ border:1px solid var(--border); border-radius:14px; padding:14px; }
-    .title{ font-weight:700; font-size:16px; margin:0 0 6px; line-height:1.2; }
-    .meta{ font-size:12px; color:var(--muted); margin-bottom:8px; }
-    .desc{ font-size:14px; margin-bottom:8px; }
-    .tags{ display:flex; gap:6px; flex-wrap:wrap; }
-    .tag{ font-size:11px; background:var(--pill); border-radius:999px; padding:2px 8px; }
-    .row{ display:flex; gap:8px; align-items:center; }
-    .right{ margin-left:auto; display:flex; gap:8px; }
-    .footer{ text-align:center; color:var(--muted); font-size:12px; padding:10px 0; }
-    a { color:#2563eb; text-decoration:none; }
-    .error{ color:#b91c1c; font-weight:600; padding:8px 0; }
+    :root{--border:#e5e7eb;--muted:#6b7280;--pill:#f3f4f6;--bg:#fff;--ink:#111}
+    *{box-sizing:border-box}
+    body{font-family:ui-sans-serif,system-ui,Arial;margin:0;background:var(--bg);color:var(--ink)}
+    header{padding:16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:10}
+    main{padding:16px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input,select,button{padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px}
+    input.search{flex:1;min-width:240px}
+    .right{margin-left:auto;display:flex;gap:8px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+    .section{margin-bottom:18px}
+    .section h3{margin:18px 0 8px;font-size:14px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .card{border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+    .title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;line-height:1.2;margin:0}
+    .meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{font-size:11px;background:var(--pill);border-radius:999px;padding:2px 8px}
+    .tags{display:flex;gap:6px;flex-wrap:wrap}
+    .tag{font-size:11px;background:#eef2ff;border-radius:999px;padding:2px 8px}
+    .desc{font-size:14px}
+    .actions{display:flex;gap:8px;margin-top:auto}
+    .btn{border:1px solid var(--border);border-radius:10px;padding:8px 10px;text-decoration:none}
+    a{color:#2563eb;text-decoration:none}
+    .error{color:#b91c1c;font-weight:600;padding:8px 0}
+    .status{font-weight:700}
+    .drawer{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:stretch;justify-content:flex-end}
+    .drawer.open{display:flex}
+    .panel{width:min(720px,92vw);background:#fff;height:100%;padding:16px 16px 24px;overflow:auto}
+    .panel h2{margin:0 0 12px}
+    pre{background:#0b1020;color:#d9e0ff;padding:12px;border-radius:12px;overflow:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border:1px solid var(--border);padding:6px 8px;text-align:left}
+    .small{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
   <header>
-    <div class="controls">
-      <input id="q" class="search" placeholder="Search name, description, tags…" />
+    <div class="row">
+      <input id="q" class="search" placeholder="Search name, fields, tags…" />
       <select id="type"><option value="">All types</option></select>
       <select id="category"><option value="">All categories</option></select>
+      <select id="status"><option value="">All status</option></select>
+      <select id="env"><option value="">All env</option></select>
+      <select id="group">
+        <option value="none">Group: None</option>
+        <option value="category">Group: Category</option>
+        <option value="type">Group: Type</option>
+      </select>
       <div class="right">
         <select id="sort">
           <option value="alpha">Sort: A–Z</option>
           <option value="updated">Sort: Updated (newest)</option>
         </select>
+        <button id="exportCsv" title="Export visible rows">Export CSV</button>
         <button id="refresh" title="Reload feed">↻</button>
       </div>
     </div>
   </header>
 
   <main>
-    <div id="status" class="meta"></div>
-    <div id="grid" class="grid"></div>
-    <div class="footer" id="footer"></div>
+    <div id="statusBar" class="small"></div>
+    <div id="container"></div>
   </main>
 
-  <script>
-  // ===================== CONFIG =====================
-  // Change FEED_URL to your manifest feed:
-  const FEED_URL = "https://feed-proxy.jorge-habib.workers.dev/?url=https%3A%2F%2Fcdn.pegasusgateway.com%2Fpegasus%2Fdashboards_resources.json";
+  <div id="drawer" class="drawer" aria-hidden="true">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="drawerTitle">Details</h2>
+        <div class="row">
+          <button id="copyJson">Copy JSON</button>
+          <button id="closeDrawer">Close</button>
+        </div>
+      </div>
+      <div id="detailMeta" class="small" style="margin-bottom:8px"></div>
+      <div id="paramBlock"></div>
+      <h3>Raw item</h3>
+      <pre id="rawJson"></pre>
+    </div>
+  </div>
 
-  // Optional: simple field mapping (left = normalized, right = your JSON keys in priority order)
-  const FIELD_MAP = {
-    id:        ["id","slug","script","key","uid","url"],
+  <script>
+  // ------- CONFIG -------
+  const FEED_URL =
+    "https://feed-proxy.jorge-habib.workers.dev/?url=" +
+    encodeURIComponent("https://cdn.pegasusgateway.com/pegasus/dashboards_resources.json");
+
+  // Prefer these keys if present; we still fall back by scanning:
+  const PREFERRED_KEYS = {
+    id:        ["id","slug","script","key","uid","url","name"],
     title:     ["title","name","script","label"],
     url:       ["url","app_url","href","link"],
-    type:      ["type","kind"],                 // e.g., Dashboard/Report/Doc
-    category:  ["category","group","section"],  // e.g., Fleet/Trips/Devices
-    tags:      ["tags","labels"],
+    type:      ["type","kind"],
+    category:  ["category","group","section"],
+    tags:      ["tags","labels","keywords"],
     description:["description","desc","summary","details"],
-    updated_at:["updated_at","modified","updated","last_modified","timestamp"]
+    updated_at:["updated_at","modified","updated","last_modified","timestamp"],
+    status:    ["status","state","phase","lifecycle"], // e.g. live/draft/deprecated
+    env:       ["env","environment","stage"]           // e.g. prod/dev/test
   };
 
-  // ===================== CORE =====================
-  const state = { items: [], q:"", type:"", category:"", sort:"alpha" };
+  // ------- UTIL -------
   const $ = s => document.querySelector(s);
-  const grid = $("#grid"), q = $("#q"), type = $("#type"), category = $("#category");
-  const sortSel = $("#sort"), refreshBtn = $("#refresh"), status = $("#status"), footer = $("#footer");
+  const container = $("#container"), q = $("#q");
+  const typeSel = $("#type"), catSel = $("#category"), statSel = $("#status"), envSel = $("#env");
+  const groupSel = $("#group"), sortSel = $("#sort"), refreshBtn = $("#refresh"), statusBar = $("#statusBar");
+  const drawer = $("#drawer"), closeDrawer = $("#closeDrawer"), copyJsonBtn = $("#copyJson");
+  const drawerTitle = $("#drawerTitle"), rawJson = $("#rawJson"), detailMeta = $("#detailMeta"), paramBlock = $("#paramBlock");
 
   const uniq = arr => [...new Set(arr.filter(Boolean))];
+  const esc = s => String(s ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#39;");
+  const toCSV = rows => rows.map(r => r.map(v => `"${String(v??"").replaceAll('"','""')}"`).join(",")).join("\n");
 
-  function pick(obj, keys) {
+  function pick(o, keys) {
     for (const k of keys) {
-      const v = obj?.[k];
+      const v = o?.[k];
       if (v !== undefined && v !== null && !(typeof v === "string" && v.trim() === "")) return v;
     }
-    return undefined;
+  }
+  function discoverKeys(obj) {
+    // look for common fields and also sniff params/config collections
+    const allKeys = Object.keys(obj || {});
+    const paramsKey = ["params","parameters","options","config","arguments","settings"].find(k => obj && typeof obj[k] === "object");
+    return { allKeys, paramsKey };
+  }
+  function faviconFor(url) {
+    try {
+      const d = new URL(url).hostname;
+      return `https://www.google.com/s2/favicons?domain=${d}&sz=32`;
+    } catch { return null; }
   }
 
-  function normalizeOne(x, i) {
+  // ------- NORMALIZE -------
+  function normalizeOne(x, i, keyHints) {
+    const nz = (a) => Array.isArray(a) ? a.filter(Boolean) : a;
     const n = {
-      id: pick(x, FIELD_MAP.id),
-      title: pick(x, FIELD_MAP.title),
-      url: pick(x, FIELD_MAP.url),
-      type: pick(x, FIELD_MAP.type),
-      category: pick(x, FIELD_MAP.category),
-      tags: pick(x, FIELD_MAP.tags) || [],
-      description: pick(x, FIELD_MAP.description) || "",
-      updated_at: pick(x, FIELD_MAP.updated_at)
+      id:        pick(x, keyHints.id)        ?? `item-${i+1}`,
+      title:     pick(x, keyHints.title)     ?? `Item ${i+1}`,
+      url:       pick(x, keyHints.url)       ?? null,
+      type:      pick(x, keyHints.type)      ?? null,
+      category:  pick(x, keyHints.category)  ?? null,
+      tags:      nz(pick(x, keyHints.tags))  ?? [],
+      description: pick(x, keyHints.description) ?? "",
+      updated_at: pick(x, keyHints.updated_at) ?? null,
+      status:    pick(x, keyHints.status)    ?? null,
+      env:       pick(x, keyHints.env)       ?? null,
+      _raw: x
     };
-    if (!n.id) n.id = n.url || `item-${i+1}`;
-    if (!n.title) n.title = `Item ${i+1}`;
     if (!Array.isArray(n.tags)) n.tags = typeof n.tags === "string" ? n.tags.split(/[,\s]+/) : [];
     return n;
   }
 
   function extractItems(json) {
-    // Try common containers: items / scripts / resources / dashboards / data / array itself
     if (Array.isArray(json)) return json;
-    const candidates = ["items","scripts","resources","dashboards","data","entries","list"];
-    for (const k of candidates) if (Array.isArray(json?.[k])) return json[k];
-    // If object of objects
+    for (const k of ["items","scripts","resources","dashboards","data","entries","list"]) {
+      if (Array.isArray(json?.[k])) return json[k];
+    }
+    // object-of-objects
     if (json && typeof json === "object") {
       const vals = Object.values(json);
       if (vals.length && vals.every(v => typeof v === "object")) return vals;
@@ -112,98 +171,188 @@
     return [];
   }
 
+  // ------- STATE -------
+  const state = { items: [], q:"", type:"", category:"", status:"", env:"", group:"none", sort:"alpha" };
+
+  // ------- RENDER -------
+  function renderAll() {
+    const items = applyFilters(state.items);
+    const grouped = groupItems(items, state.group);
+    container.innerHTML = grouped.map(renderSection).join("");
+    statusBar.textContent = `Loaded ${state.items.length} items · Showing ${items.length}`;
+  }
+
   function applyFilters(items) {
     const qv = state.q.toLowerCase();
-    let filtered = items.filter(it => {
-      const hay = `${it.title||""} ${it.description||""} ${(it.tags||[]).join(" ")}`.toLowerCase();
+    let out = items.filter(it => {
+      const hay = [
+        it.title, it.description, it.type, it.category, it.status, it.env,
+        ...(it.tags || [])
+      ].join(" ").toLowerCase();
       const matchQ = !qv || hay.includes(qv);
       const matchT = !state.type || it.type === state.type;
       const matchC = !state.category || it.category === state.category;
-      return matchQ && matchT && matchC;
+      const matchS = !state.status || it.status === state.status;
+      const matchE = !state.env || it.env === state.env;
+      return matchQ && matchT && matchC && matchS && matchE;
     });
-    if (state.sort === "alpha") {
-      filtered = filtered.sort((a,b)=> (a.title||"").localeCompare(b.title||""));
-    } else if (state.sort === "updated") {
-      filtered = filtered.sort((a,b)=> (new Date(b.updated_at||0)) - (new Date(a.updated_at||0)));
+    if (state.sort === "alpha") out.sort((a,b)=>(a.title||"").localeCompare(b.title||""));
+    if (state.sort === "updated") out.sort((a,b)=>(new Date(b.updated_at||0))-(new Date(a.updated_at||0)));
+    return out;
+  }
+
+  function groupItems(items, mode) {
+    if (mode === "category") return groupBy(items, it => it.category || "Uncategorized");
+    if (mode === "type") return groupBy(items, it => it.type || "Untyped");
+    return [{ title: null, items }];
+  }
+  function groupBy(items, keyFn) {
+    const map = new Map();
+    for (const it of items) {
+      const k = keyFn(it);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(it);
     }
-    return filtered;
+    return [...map.entries()].map(([title, items]) => ({ title, items }));
   }
 
-  function render(items) {
-    grid.innerHTML = items.map(it => `
-      <div class="card">
-        <div class="title">${escapeHtml(it.title)}</div>
-        <div class="meta">
-          ${it.type ? `<b>${escapeHtml(it.type)}</b>` : ''} ${it.category ? `· ${escapeHtml(it.category)}` : ''}
-          ${it.updated_at ? ` · ${new Date(it.updated_at).toLocaleDateString()}` : ''}
+  function renderSection(sec) {
+    return `
+      ${sec.title ? `<div class="section"><h3>${esc(sec.title)}</h3>` : `<div class="section">`}
+        <div class="grid">
+          ${sec.items.map(renderCard).join("")}
         </div>
-        ${it.description ? `<div class="desc">${escapeHtml(it.description)}</div>` : ''}
-        ${it.tags?.length ? `<div class="tags">${it.tags.map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
-        ${it.url ? `<div style="margin-top:8px"><a href="${encodeURI(it.url)}" target="_blank" rel="noopener">Open</a></div>` : ''}
       </div>
-    `).join("");
+    `;
   }
 
-  function fillFilters(items) {
-    const types = uniq(items.map(i=>i.type));
-    const cats  = uniq(items.map(i=>i.category));
-    type.innerHTML = ['<option value="">All types</option>', ...types.map(t=>`<option>${escapeHtml(t)}</option>`)].join('');
-    category.innerHTML = ['<option value="">All categories</option>', ...cats.map(c=>`<option>${escapeHtml(c)}</option>`)].join('');
+  function renderCard(it) {
+    const fav = it.url ? faviconFor(it.url) : null;
+    const meta = [it.type, it.category, it.updated_at ? new Date(it.updated_at).toLocaleDateString() : null].filter(Boolean).join(" · ");
+    const badges = [
+      it.status ? `<span class="badge">status: ${esc(it.status)}</span>` : "",
+      it.env ? `<span class="badge">env: ${esc(it.env)}</span>` : ""
+    ].join("");
+
+    return `
+      <div class="card" data-id="${esc(it.id)}">
+        <h4 class="title">
+          ${fav ? `<img src="${fav}" width="16" height="16" alt="">` : ""}
+          ${esc(it.title)}
+        </h4>
+        <div class="meta">${esc(meta)}</div>
+        ${badges ? `<div class="badges">${badges}</div>` : ""}
+        ${it.description ? `<div class="desc">${esc(it.description)}</div>` : ""}
+        ${it.tags?.length ? `<div class="tags">${it.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
+        <div class="actions">
+          ${it.url ? `<a class="btn" href="${encodeURI(it.url)}" target="_blank" rel="noopener">Open</a>` : ""}
+          <button class="btn" data-action="details" data-id="${esc(it.id)}">Details</button>
+        </div>
+      </div>
+    `;
   }
 
-  function escapeHtml(s) {
-    return String(s ?? "")
-      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;").replaceAll("'","&#39;");
+  // ------- DETAILS DRAWER -------
+  function openDrawer(item) {
+    drawerTitle.textContent = item.title;
+    detailMeta.innerHTML = [
+      item.type && `<b>Type:</b> ${esc(item.type)}`,
+      item.category && `<b>Category:</b> ${esc(item.category)}`,
+      item.status && `<b>Status:</b> ${esc(item.status)}`,
+      item.env && `<b>Env:</b> ${esc(item.env)}`,
+      item.updated_at && `<b>Updated:</b> ${esc(new Date(item.updated_at).toLocaleString())}`,
+      item.url && `<b>URL:</b> <a href="${encodeURI(item.url)}" target="_blank" rel="noopener">${esc(item.url)}</a>`
+    ].filter(Boolean).join(" · ");
+
+    // Params table if present
+    const params = item._raw?.params || item._raw?.parameters || item._raw?.options || item._raw?.config || null;
+    if (params && typeof params === "object") {
+      const rows = Object.entries(params).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(typeof v==='object'?JSON.stringify(v):String(v))}</td></tr>`).join("");
+      paramBlock.innerHTML = `<h3>Parameters</h3><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`;
+    } else {
+      paramBlock.innerHTML = "";
+    }
+
+    rawJson.textContent = JSON.stringify(item._raw, null, 2);
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden","false");
+  }
+  function closeDrawerFn(){ drawer.classList.remove("open"); drawer.setAttribute("aria-hidden","true"); }
+  closeDrawer.addEventListener("click", closeDrawerFn);
+  drawer.addEventListener("click", e => { if (e.target === drawer) closeDrawerFn(); });
+  copyJsonBtn.addEventListener("click", async ()=>{
+    await navigator.clipboard.writeText(rawJson.textContent);
+    copyJsonBtn.textContent = "Copied!"; setTimeout(()=>copyJsonBtn.textContent="Copy JSON",1500);
+  });
+  container.addEventListener("click", e=>{
+    const btn = e.target.closest("button[data-action='details']");
+    if (!btn) return;
+    const id = btn.getAttribute("data-id");
+    const item = state.items.find(x=>String(x.id)===String(id));
+    if (item) openDrawer(item);
+  });
+
+  // ------- FILTER UI -------
+  function fillFilters(items){
+    const types = uniq(items.map(i=>i.type)), cats = uniq(items.map(i=>i.category));
+    const stats = uniq(items.map(i=>i.status)), envs = uniq(items.map(i=>i.env));
+    typeSel.innerHTML = ['<option value="">All types</option>', ...types.map(t=>`<option>${esc(t)}</option>`)].join('');
+    catSel.innerHTML  = ['<option value="">All categories</option>', ...cats.map(c=>`<option>${esc(c)}</option>`)].join('');
+    statSel.innerHTML = ['<option value="">All status</option>', ...stats.map(s=>`<option>${esc(s)}</option>`)].join('');
+    envSel.innerHTML  = ['<option value="">All env</option>', ...envs.map(v=>`<option>${esc(v)}</option>`)].join('');
   }
 
-  function persistToHash() {
-    const params = new URLSearchParams();
-    if (state.q) params.set("q", state.q);
-    if (state.type) params.set("type", state.type);
-    if (state.category) params.set("category", state.category);
-    if (state.sort !== "alpha") params.set("sort", state.sort);
-    location.hash = params.toString();
+  // ------- EXPORT -------
+  function exportVisibleCSV() {
+    const items = applyFilters(state.items);
+    const header = ["title","type","category","status","env","updated_at","url","tags"];
+    const rows = [header].concat(items.map(it => [
+      it.title, it.type ?? "", it.category ?? "", it.status ?? "", it.env ?? "",
+      it.updated_at ? new Date(it.updated_at).toISOString() : "",
+      it.url ?? "", (it.tags||[]).join("|")
+    ]));
+    const blob = new Blob([toCSV(rows)], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "dashboards_visible.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
-  function readFromHash() {
-    const p = new URLSearchParams(location.hash.replace(/^#/,''));
-    state.q = p.get("q") || "";
-    state.type = p.get("type") || "";
-    state.category = p.get("category") || "";
-    state.sort = p.get("sort") || "alpha";
-    q.value = state.q; type.value = state.type; category.value = state.category; sortSel.value = state.sort;
-  }
-
-  async function loadFeed() {
-    status.textContent = "Loading…";
-    grid.innerHTML = "";
-    try {
-      const res = await fetch(FEED_URL, { mode: "cors" });
+  // ------- LOAD -------
+  async function loadFeed(){
+    statusBar.textContent = "Loading…";
+    container.innerHTML = "";
+    try{
+      const res = await fetch(FEED_URL, { mode:"cors" });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const json = await res.json();
       const raw = extractItems(json);
-      state.items = raw.map(normalizeOne);
+      if (!raw.length) throw new Error("No items found in feed");
+      // discover keys from the first item
+      const { allKeys } = discoverKeys(raw[0]);
+      const keyHints = Object.fromEntries(Object.entries(PREFERRED_KEYS).map(([k,defaults])=>[k, uniq([...defaults, ...allKeys])]));
+      state.items = raw.map((x,i)=>normalizeOne(x,i,keyHints));
       fillFilters(state.items);
-      render(applyFilters(state.items));
-      status.textContent = `Loaded ${state.items.length} items`;
-      footer.textContent = typeof json?.updated_at === "string" ? `Feed updated ${new Date(json.updated_at).toLocaleString()}` : "";
-      persistToHash();
-    } catch (err) {
-      status.innerHTML = `<span class="error">Failed to load feed: ${escapeHtml(err.message)}</span>`;
+      renderAll();
+    }catch(e){
+      container.innerHTML = `<div class="error">Failed to load feed: ${esc(e.message)}</div>`;
+      statusBar.textContent = "";
     }
   }
 
-  // Events
-  q.addEventListener("input", e => { state.q = e.target.value; render(applyFilters(state.items)); persistToHash(); });
-  type.addEventListener("change", e => { state.type = e.target.value; render(applyFilters(state.items)); persistToHash(); });
-  category.addEventListener("change", e => { state.category = e.target.value; render(applyFilters(state.items)); persistToHash(); });
-  sortSel.addEventListener("change", e => { state.sort = e.target.value; render(applyFilters(state.items)); persistToHash(); });
+  // ------- EVENTS -------
+  q.addEventListener("input", e=>{ state.q=e.target.value; renderAll(); });
+  typeSel.addEventListener("change", e=>{ state.type=e.target.value; renderAll(); });
+  catSel.addEventListener("change", e=>{ state.category=e.target.value; renderAll(); });
+  statSel.addEventListener("change", e=>{ state.status=e.target.value; renderAll(); });
+  envSel.addEventListener("change", e=>{ state.env=e.target.value; renderAll(); });
+  groupSel.addEventListener("change", e=>{ state.group=e.target.value; renderAll(); });
+  sortSel.addEventListener("change", e=>{ state.sort=e.target.value; renderAll(); });
   refreshBtn.addEventListener("click", loadFeed);
-  window.addEventListener("hashchange", () => { readFromHash(); render(applyFilters(state.items)); });
+  $("#exportCsv").addEventListener("click", exportVisibleCSV);
 
-  // Boot
-  readFromHash();
+  // boot
   loadFeed();
   </script>
 </body>
